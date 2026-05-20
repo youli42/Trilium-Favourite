@@ -32,3 +32,4 @@
 1. 创建收藏夹面板笔记结构（render note→HTML→JS）
 2. 完成 HTML 模板与 JS 逻辑实现
 3. 新增 promoted 属性配置、卡片标签可点击筛选、卡片图标使用笔记自己的 iconClass
+4. 修复：api.currentNote → api.startNote（promoted 属性读取修复）+ favLabel 自动去除 # 前缀
