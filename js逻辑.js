@@ -29,11 +29,9 @@
     return t.substring(0, maxLen) + '…';
   }
 
-  function findOwnIconClass(labels) {
+  function findOwnValue(labels, name) {
     for (var i = 0; i < labels.length; i++) {
-      if (labels[i] && labels[i].name === 'iconClass') {
-        return labels[i].value || '';
-      }
+      if (labels[i] && labels[i].name === name) return labels[i].value || '';
     }
     return '';
   }
@@ -95,11 +93,13 @@
         var labels;
         try { labels = note.getLabels() || []; } catch (e) { labels = []; }
 
-        var ownIcon = findOwnIconClass(labels);
+        var ownIcon  = findOwnValue(labels, 'iconClass');
+        var ownColor = findOwnValue(labels, 'color');
+
         var tags = [];
         for (var j = 0; j < labels.length; j++) {
           var lb = labels[j];
-          if (!lb || isSystemLabel(lb.name)) continue;
+          if (!lb || lb.name === 'color' || lb.name === 'iconClass' || isSystemLabel(lb.name)) continue;
           var display = lb.value ? lb.name + ': ' + lb.value : lb.name;
           var key = lb.name + '\x00' + (lb.value || '');
           tags.push({ name: lb.name, value: lb.value || '', display: display, key: key });
@@ -112,7 +112,7 @@
 
         allNotes.push({
           noteId: note.noteId, title: note.title, type: note.type, mime: note.mime,
-          iconClass: ownIcon, description: description, tags: tags
+          iconClass: ownIcon, cardColor: ownColor, description: description, tags: tags
         });
       }
 
@@ -198,6 +198,8 @@
       card.className = 'fav-card';
       (function(id) { card.addEventListener('click', function() { api.activateNote(id); }); })(n.noteId);
 
+      if (n.cardColor) card.style.borderColor = n.cardColor;
+
       var titleRow = document.createElement('div');
       titleRow.className = 'fav-card-title';
       var iconEl = document.createElement('span');
@@ -216,6 +218,7 @@
       titleText.title = n.title;
       titleRow.appendChild(iconEl);
       titleRow.appendChild(titleText);
+      if (n.cardColor) titleText.style.color = n.cardColor;
       card.appendChild(titleRow);
 
       if (n.description) {
