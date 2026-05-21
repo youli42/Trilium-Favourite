@@ -2,20 +2,6 @@
 (function() {
   'use strict';
 
-  function getFallbackIcon(type, mime) {
-    var icons = {
-      text: '📝', code: '💻', file: '📄', image: '🖼️',
-      search: '🔍', book: '📓', relationMap: '🔗', render: '🎨',
-      mermaid: '🔷', webView: '🌐'
-    };
-    if (mime) {
-      if (mime.indexOf('mermaid') >= 0) return icons.mermaid;
-      if (mime.indexOf('javascript') >= 0) return '🟨';
-      if (mime.indexOf('html') >= 0) return icons.webView;
-    }
-    return icons[type] || '📌';
-  }
-
   function stripHtml(html) {
     var d = document.createElement('div');
     d.innerHTML = html;
@@ -218,15 +204,10 @@
       var titleRow = document.createElement('div');
       titleRow.className = 'fav-card-title';
       var iconEl = document.createElement('span');
-      iconEl.className = 'fav-card-title-icon';
-      if (n.iconClass) {
-        iconEl.className = 'fav-card-title-icon i-class';
-        var iTag = document.createElement('i');
-        iTag.className = n.iconClass;
-        iconEl.appendChild(iTag);
-      } else {
-        iconEl.textContent = getFallbackIcon(n.type, n.mime);
-      }
+      iconEl.className = 'fav-card-title-icon i-class';
+      var iTag = document.createElement('i');
+      iTag.className = n.iconClass || 'bx bx-note';
+      iconEl.appendChild(iTag);
       var titleText = document.createElement('span');
       titleText.className = 'fav-card-title-text';
       titleText.textContent = n.title;
