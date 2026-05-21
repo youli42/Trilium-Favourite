@@ -56,18 +56,17 @@
   var searchInput, tagBarEl, metaEl, gridEl;
 
   async function readConfig() {
-    var results = await api.searchForNotes('#favPanelId = main');
-    if (!results || results.length === 0) {
-      throw new Error('未找到面板配置：收藏夹面板缺少 #favPanelId = main 标签');
+    var src = api.startNote;
+    if (!src || typeof src.getLabelValue !== 'function') {
+      throw new Error('api.startNote 不可用，无法读取面板配置');
     }
-    var panelNote = results[0];
-    var raw = panelNote.getLabelValue('favLabel');
+    var raw = src.getLabelValue('favLabel');
     if (!raw) {
       throw new Error('缺少 #favLabel 属性，请在笔记属性中设置要搜索的标签名');
     }
     _cfgFavLabel  = raw.replace(/^#+/, '');
-    _cfgDescLines = parseInt(panelNote.getLabelValue('favDescLines')) || 3;
-    _cfgInheritColor = panelNote.getLabelValue('favInheritColor') === 'true';
+    _cfgDescLines = parseInt(src.getLabelValue('favDescLines')) || 3;
+    _cfgInheritColor = src.getLabelValue('favInheritColor') === 'true';
     document.getElementById('fav-app').style.setProperty('--fav-desc-lines', _cfgDescLines);
   }
 
