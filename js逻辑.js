@@ -56,17 +56,27 @@
   var searchInput, tagBarEl, metaEl, gridEl;
 
   async function readConfig() {
-    var src = api.startNote;
-    if (!src || typeof src.getLabelValue !== 'function') {
-      throw new Error('api.startNote 不可用，无法读取面板配置');
-    }
-    var raw = src.getLabelValue('favLabel');
-    if (!raw) {
-      throw new Error('缺少 #favLabel 属性，请在笔记属性中设置要搜索的标签名');
-    }
+    var config = await api.runOnBackend(function(scriptId) {
+      var scriptNote = api.getNote(scriptId);
+      if (!scriptNote) throw new Error('无法获取当前脚本笔记');
+      var parents = scriptNote.getParentNotes();
+      if (!parents || parents.length === 0) throw new Error('脚本笔记无父级');
+      var htmlNote = parents[0];
+      var grandParents = htmlNote.getParentNotes();
+      if (!grandParents || grandParents.length === 0) throw new Error('HTML 模板无父级');
+      var renderNote = grandParents[0];
+      return {
+        favLabel: renderNote.getLabelValue('favLabel'),
+        descLines: renderNote.getLabelValue('favDescLines'),
+        inheritColor: renderNote.getLabelValue('favInheritColor')
+      };
+    }, [api.currentNote.noteId]);
+
+    var raw = config.favLabel;
+    if (!raw) throw new Error('缺少 #favLabel 属性，请在笔记属性中设置要搜索的标签名');
     _cfgFavLabel  = raw.replace(/^#+/, '');
-    _cfgDescLines = parseInt(src.getLabelValue('favDescLines')) || 3;
-    _cfgInheritColor = src.getLabelValue('favInheritColor') === 'true';
+    _cfgDescLines = parseInt(config.descLines) || 3;
+    _cfgInheritColor = config.inheritColor === 'true';
     document.getElementById('fav-app').style.setProperty('--fav-desc-lines', _cfgDescLines);
   }
 
