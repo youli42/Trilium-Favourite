@@ -18,6 +18,8 @@ This plugin adds a **Favourites Panel** to Trilium's frontend showcase page. It 
 - **Responsive Grid** — Cards auto-arrange and wrap based on page width
 - **Theme Aware** — Styling follows Trilium's theme using CSS variables
 
+![样例](file/show.png)
+
 ## Installation
 
 ### Option 1: Manual File Copy
@@ -45,11 +47,11 @@ Download the latest archive from the [Releases](../../releases) page and import 
 The panel reads its configuration from promoted attributes on the render note itself.
 Edit them in the note's attribute panel (labeled fields will appear automatically).
 
-| Attribute | Description | Default |
-|-----------|-------------|---------|
-| `#favLabel` | The label to search for | `favourite` |
-| `#favDescLines` | Number of description lines to show | `3` |
-| `#favInheritColor` | Whether to use inherited `#color` labels (true/false) | `false` |
+| Attribute          | Description                                           | Default     |
+| ------------------ | ----------------------------------------------------- | ----------- |
+| `#favLabel`        | The label to search for                               | `favourite` |
+| `#favDescLines`    | Number of description lines to show                   | `3`         |
+| `#favInheritColor` | Whether to use inherited `#color` labels (true/false) | `false`     |
 
 You can clone this panel and give each clone a different `#favLabel` to create multiple categorised collections (e.g. `#bookmark`, `#readlater`, `#project`).
 
@@ -57,13 +59,13 @@ You can clone this panel and give each clone a different `#favLabel` to create m
 
 ### APIs Used
 
-| API | Purpose |
-|-----|---------|
-| `api.searchForNotes("#favourite")` | Search all notes with the configured label |
-| `note.getLabels()` | Get own labels (for tags, iconClass, color) |
-| `note.getLabelValue("color")` | Get effective color (own or inherited) |
-| `note.getContent()` | Get note HTML content for description |
-| `api.activateNote(noteId)` | Navigate to a note on card click |
+| API                                | Purpose                                     |
+| ---------------------------------- | ------------------------------------------- |
+| `api.searchForNotes("#favourite")` | Search all notes with the configured label  |
+| `note.getLabels()`                 | Get own labels (for tags, iconClass, color) |
+| `note.getLabelValue("color")`      | Get effective color (own or inherited)      |
+| `note.getContent()`                | Get note HTML content for description       |
+| `api.activateNote(noteId)`         | Navigate to a note on card click            |
 
 ### Implementation Details
 
