@@ -89,15 +89,4 @@ nlKR1j0QzfmS (Frontend Showcase)
               └── PaGSIRd20Aup js (code, mime: application/javascript;env=frontend)
 ```
 
-## Changelog
 
-```
-bef1045 同步 HTML 模板的彩色边框 CSS 到仓库文件
-b0fd142 新增 favInheritColor 提升属性，控制是否使用继承颜色
-e47b1c6 卡片使用笔记自身的 color 标签渲染边框和标题颜色
-6b90afa 移除 favLabel 兜底逻辑，改用 #favPanelId=main 搜索面板笔记读取配置
-b88e2bc 将 Trilium 笔记中的 HTML 模板和 JS 逻辑同步到仓库文件
-b1b95f0 修复: api.currentNote→api.startNote 修复 promoted 属性读取 + favLabel 自动去除 # 前缀
-dc2f704 新增 promoted 属性配置、卡片标签可点击筛选、图标使用笔记自己的 iconClass
-4108bbe 完成收藏夹面板 HTML 模板与 JS 逻辑
-```
