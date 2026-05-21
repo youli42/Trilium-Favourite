@@ -51,7 +51,7 @@
       || name.indexOf('relation:') === 0;
   }
 
-  var _cfgFavLabel, _cfgDescLines;
+  var _cfgFavLabel, _cfgDescLines, _cfgInheritColor;
   var allNotes = [], tagMap = {}, activeTags = {}, searchTerm = '';
   var searchInput, tagBarEl, metaEl, gridEl;
 
@@ -67,6 +67,7 @@
     }
     _cfgFavLabel  = raw.replace(/^#+/, '');
     _cfgDescLines = parseInt(panelNote.getLabelValue('favDescLines')) || 3;
+    _cfgInheritColor = panelNote.getLabelValue('favInheritColor') === 'true';
     document.getElementById('fav-app').style.setProperty('--fav-desc-lines', _cfgDescLines);
   }
 
@@ -94,7 +95,12 @@
         try { labels = note.getLabels() || []; } catch (e) { labels = []; }
 
         var ownIcon  = findOwnValue(labels, 'iconClass');
-        var ownColor = findOwnValue(labels, 'color');
+        var ownColor;
+        if (_cfgInheritColor) {
+          ownColor = note.getLabelValue('color') || '';
+        } else {
+          ownColor = findOwnValue(labels, 'color');
+        }
 
         var tags = [];
         for (var j = 0; j < labels.length; j++) {
