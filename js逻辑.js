@@ -33,13 +33,6 @@
     return text.replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
-  function truncate(text, maxLen) {
-    if (!text) return '';
-    var t = text.replace(/\s+/g, ' ').trim();
-    if (t.length <= maxLen) return t;
-    return t.substring(0, maxLen) + '…';
-  }
-
   function tagKey(name, value) {
     return name + '\x00' + (value || '');
   }
@@ -82,18 +75,22 @@
 
   async function loadAllTags() {
     try {
-      allTags = await api.runOnBackend(function() {
+      allTags = await api.runOnBackend(function(label) {
         var rows = api.sql.getRows(
-          "SELECT attr.name, COALESCE(attr.value, '') as value, COUNT(*) as cnt " +
-          "FROM attributes attr " +
-          "WHERE attr.type = 'label' AND attr.isDeleted = 0 " +
-          "GROUP BY attr.name, attr.value " +
-          "ORDER BY cnt DESC"
+          "SELECT a.name, COALESCE(a.value, '') as value, COUNT(*) as cnt " +
+          "FROM attributes a " +
+          "WHERE a.type = 'label' AND a.isDeleted = 0 " +
+          "AND a.noteId IN ( " +
+            "SELECT f.noteId FROM attributes f " +
+            "WHERE f.type = 'label' AND f.name = ? AND f.isDeleted = 0 " +
+          ") " +
+          "GROUP BY a.name, a.value ORDER BY cnt DESC",
+          [label]
         );
         return rows.map(function(r) {
           return { name: r.name, value: r.value, count: r.cnt };
         });
-      }, []);
+      }, [_cfgFavLabel]);
     } catch (e) {
       console.error('Failed to load tags', e);
       allTags = [];
