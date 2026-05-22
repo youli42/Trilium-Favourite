@@ -20,6 +20,8 @@ This plugin adds a **Favourites Panel** to Trilium's frontend showcase page. It 
 - **Responsive Grid** — Cards auto-arrange and wrap based on page width
 - **Theme Aware** — Styling follows Trilium's theme using CSS variables
 
+![演示](file/show.png)
+
 ## Installation
 
 ### Option 1: Manual File Copy
@@ -47,11 +49,11 @@ Download the latest archive from the [Releases](../../releases) page and import 
 The panel reads its configuration from promoted attributes on the render note itself.
 Edit them in the note's attribute panel (labeled fields will appear automatically).
 
-| Attribute | Description | Default |
-|---|---|---|
-| `#favLabel` | The label to search for | `favourite` |
-| `#favDescLines` | Number of description lines to show | `3` |
-| `#favInheritColor` | Whether to use inherited `#color` labels | `false` |
+| Attribute          | Description                              | Default     |
+| ------------------ | ---------------------------------------- | ----------- |
+| `#favLabel`        | The label to search for                  | `favourite` |
+| `#favDescLines`    | Number of description lines to show      | `3`         |
+| `#favInheritColor` | Whether to use inherited `#color` labels | `false`     |
 
 You can clone this panel and give each clone a different `#favLabel` to create multiple categorised collections (e.g. `#bookmark`, `#readlater`, `#project`).
 
@@ -59,17 +61,17 @@ You can clone this panel and give each clone a different `#favLabel` to create m
 
 ### APIs Used
 
-| API | Purpose |
-|---|---|
-| `api.searchForNotes("#favourite")` | Search all notes with the configured label |
-| `api.runOnBackend(callback, args)` | Execute backend code (config reading, tag loading, paginated search) |
-| `api.sql.getRows(query, params)` | SQL query for loading tags scoped to the collection |
-| `note.getAttributes()` | Get all labels of a note (on backend) |
-| `note.getContent()` | Get note HTML content for description |
-| `api.activateNote(noteId)` | Navigate to a note on card click |
-| `api.getNote(noteId)` | Get a note by ID (on backend) |
-| `note.getParentNotes()` | Traverse up the note tree to find the render note |
-| `getComputedStyle(document.documentElement)` | Read Trilium theme CSS variables for theming |
+| API                                          | Purpose                                                              |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| `api.searchForNotes("#favourite")`           | Search all notes with the configured label                           |
+| `api.runOnBackend(callback, args)`           | Execute backend code (config reading, tag loading, paginated search) |
+| `api.sql.getRows(query, params)`             | SQL query for loading tags scoped to the collection                  |
+| `note.getAttributes()`                       | Get all labels of a note (on backend)                                |
+| `note.getContent()`                          | Get note HTML content for description                                |
+| `api.activateNote(noteId)`                   | Navigate to a note on card click                                     |
+| `api.getNote(noteId)`                        | Get a note by ID (on backend)                                        |
+| `note.getParentNotes()`                      | Traverse up the note tree to find the render note                    |
+| `getComputedStyle(document.documentElement)` | Read Trilium theme CSS variables for theming                         |
 
 ### Implementation Details
 

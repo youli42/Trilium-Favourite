@@ -20,6 +20,8 @@ Trilium 虽然有内置的书签系统，但缺乏一个可视化面板来一览
 - **自适应网格** — 卡片根据页面宽度自动排列、自动换行
 - **跟随主题** — 样式使用 CSS 变量，自动适配 Trilium 的亮暗主题
 
+![演示](file/show.png)
+
 ## 安装指南
 
 ### 方式一：手动复制文件
@@ -46,11 +48,11 @@ Trilium 虽然有内置的书签系统，但缺乏一个可视化面板来一览
 
 面板从自身笔记的提升属性中读取配置。在笔记的"标签"面板中即可看到可编辑字段。
 
-| 属性 | 说明 | 默认值 |
-|---|---|---|
-| `#favLabel` | 收藏标签名 | `favourite` |
-| `#favDescLines` | 描述显示行数 | `3` |
-| `#favInheritColor` | 是否使用继承的颜色（true/false） | `false` |
+| 属性               | 说明                             | 默认值      |
+| ------------------ | -------------------------------- | ----------- |
+| `#favLabel`        | 收藏标签名                       | `favourite` |
+| `#favDescLines`    | 描述显示行数                     | `3`         |
+| `#favInheritColor` | 是否使用继承的颜色（true/false） | `false`     |
 
 你可以克隆该面板，给每个副本设置不同的 `#favLabel`，实现多个分类收藏夹（如 `#bookmark`、`#readlater`、`#project`）。
 
@@ -58,17 +60,17 @@ Trilium 虽然有内置的书签系统，但缺乏一个可视化面板来一览
 
 ### 所用 API
 
-| API | 用途 |
-|---|---|
-| `api.searchForNotes("#favourite")` | 搜索所有带指定标签的笔记 |
-| `api.runOnBackend(callback, args)` | 在后端执行配置读取、标签加载、分页搜索 |
-| `api.sql.getRows(query, params)` | SQL 查询，用于加载限定范围内的标签 |
-| `note.getAttributes()` | 获取笔记的所有标签（后端） |
-| `note.getContent()` | 获取笔记 HTML 正文，提取描述文本 |
-| `api.activateNote(noteId)` | 点击卡片跳转到对应笔记 |
-| `api.getNote(noteId)` | 按 ID 获取笔记（后端） |
-| `note.getParentNotes()` | 向上遍历笔记树找到收藏夹面板 |
-| `getComputedStyle(document.documentElement)` | 读取 Trilium 主题 CSS 变量 |
+| API                                          | 用途                                   |
+| -------------------------------------------- | -------------------------------------- |
+| `api.searchForNotes("#favourite")`           | 搜索所有带指定标签的笔记               |
+| `api.runOnBackend(callback, args)`           | 在后端执行配置读取、标签加载、分页搜索 |
+| `api.sql.getRows(query, params)`             | SQL 查询，用于加载限定范围内的标签     |
+| `note.getAttributes()`                       | 获取笔记的所有标签（后端）             |
+| `note.getContent()`                          | 获取笔记 HTML 正文，提取描述文本       |
+| `api.activateNote(noteId)`                   | 点击卡片跳转到对应笔记                 |
+| `api.getNote(noteId)`                        | 按 ID 获取笔记（后端）                 |
+| `note.getParentNotes()`                      | 向上遍历笔记树找到收藏夹面板           |
+| `getComputedStyle(document.documentElement)` | 读取 Trilium 主题 CSS 变量             |
 
 ### 实现要点
 
