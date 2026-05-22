@@ -27,14 +27,79 @@
     border-color: rgba(128,128,128,0.5);
   }
 
-  /* ── Tag filter bar ── */
-  .fav-tag-bar {
+  /* ── Tag input area ── */
+  .fav-tag-input-area {
+    margin-bottom: 6px;
+  }
+  .fav-tag-input-area input {
+    width: 100%;
+    box-sizing: border-box;
+    font-size: 13px;
+    padding: 6px 10px;
+    border: 1px solid rgba(128,128,128,0.2);
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .fav-tag-input-area input:focus {
+    border-color: rgba(128,128,128,0.45);
+  }
+
+  /* ── Selected tags bar ── */
+  .fav-selected-tags {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
-    margin-bottom: 8px;
+    padding: 4px 0;
+    margin-bottom: 4px;
     min-height: 24px;
   }
+  .fav-selected-tag {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: rgba(128,128,128,0.12);
+    border: 1px solid rgba(128,128,128,0.25);
+  }
+  .fav-selected-tag .remove-tag {
+    cursor: pointer;
+    opacity: 0.5;
+    font-size: 13px;
+    line-height: 1;
+    margin-left: 2px;
+  }
+  .fav-selected-tag .remove-tag:hover {
+    opacity: 1;
+  }
+
+  /* ── Tag section ── */
+  .fav-tag-section-label {
+    font-size: 12px;
+    opacity: 0.5;
+    margin: 6px 2px 4px;
+    font-weight: 500;
+  }
+  .fav-tag-rows {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+    min-height: 20px;
+  }
+  .fav-tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 0 2px;
+  }
+
+  /* ── Tag chip ── */
   .fav-tag-chip {
     display: inline-flex;
     align-items: center;
@@ -61,14 +126,63 @@
     background: rgba(128,128,128,0.14);
     border-color: rgba(128,128,128,0.45);
   }
+  .fav-tag-chip.name-active {
+    opacity: 1;
+    border-color: rgba(100,200,100,0.5);
+  }
+  .fav-tag-chip .tag-count {
+    font-size: 10px;
+    opacity: 0.5;
+  }
+  .fav-tag-chip .tag-name {
+    font-weight: 500;
+  }
+  .fav-tag-chip .tag-value {
+    opacity: 0.75;
+  }
+  .fav-tag-chip .tag-sep {
+    opacity: 0.3;
+  }
+  .fav-empty-tags {
+    font-size: 13px;
+    opacity: 0.4;
+    padding: 8px 4px;
+  }
 
-  /* ── Meta ── */
+  /* ── Pagination / Meta ── */
   .fav-meta {
     font-size: 13px;
     opacity: 0.5;
     margin-bottom: 8px;
     padding-bottom: 8px;
     border-bottom: 1px solid rgba(128,128,128,0.1);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .fav-meta .page-btn {
+    background: none;
+    border: 1px solid rgba(128,128,128,0.25);
+    border-radius: 4px;
+    padding: 2px 10px;
+    color: inherit;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+  }
+  .fav-meta .page-btn:hover {
+    background: rgba(128,128,128,0.08);
+  }
+  .fav-meta .page-select {
+    border: 1px solid rgba(128,128,128,0.25);
+    border-radius: 4px;
+    padding: 2px 4px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
   }
 
   /* ── Card grid ── */
@@ -113,7 +227,7 @@
     align-items: center;
     gap: 6px;
   }
-  .fav-card-title-icon {
+  .fav-card-title-icon.i-class {
     font-size: 16px;
     flex-shrink: 0;
   }
@@ -133,12 +247,6 @@
     -webkit-box-orient: vertical;
     overflow: hidden;
     max-height: calc(1.55em * var(--fav-desc-lines, 3));
-  }
-
-  /* icon class support */
-  .fav-card-title-icon.i-class {
-    font-size: 16px;
-    flex-shrink: 0;
   }
   .fav-card-desc:empty {
     display: none;
@@ -181,20 +289,26 @@
     opacity: 0.6;
     margin-top: 6px;
   }
+
+  .fav-loading-tags {
+    font-size: 13px;
+    opacity: 0.4;
+    padding: 20px 4px;
+  }
 </style>
 
 <div id="fav-app">
   <div class="fav-filter">
-    <input
-      type="text"
-      id="fav-search-input"
-      class="fav-filter-input"
-      placeholder="搜索标题、标签或内容..."
-      spellcheck="false"
-      autocomplete="off"
-    />
+    <input type="text" id="fav-search-input" class="fav-filter-input" placeholder="搜索标题或内容..." spellcheck="false" autocomplete="off" />
   </div>
-  <div id="fav-tag-bar" class="fav-tag-bar"></div>
+  <div class="fav-tag-input-area">
+    <input type="text" id="fav-tag-input" placeholder="输入标签名筛选..." spellcheck="false" autocomplete="off" />
+  </div>
+  <div id="fav-selected-tags" class="fav-selected-tags"></div>
+  <div class="fav-tag-section-label">热门标签</div>
+  <div id="fav-tag-rows" class="fav-tag-rows">
+    <div class="fav-loading-tags">加载标签中...</div>
+  </div>
   <div class="fav-meta" id="fav-meta"></div>
   <div id="fav-grid" class="fav-grid">
     <div class="fav-empty">
