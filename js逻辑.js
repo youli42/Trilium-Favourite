@@ -167,8 +167,9 @@
   }
 
   function buildQuery(textQuery) {
-    var parts = ['#' + _cfgFavLabel];
+    var parts = [];
     if (textQuery) parts.push(textQuery);
+    parts.push('#' + _cfgFavLabel);
     Object.keys(selectedNames).forEach(function(n) { parts.push('#' + n); });
     var vk = Object.keys(selectedTags);
     if (vk.length) {
