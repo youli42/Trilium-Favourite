@@ -29,10 +29,8 @@
     document.getElementById('fav-app').style.setProperty('--fav-desc-lines', _cfgDescLines);
   }
 
-  function stripHtml(html) {
-    var d = document.createElement('div');
-    d.innerHTML = html;
-    return d.textContent || d.innerText || '';
+  function stripHtml(text) {
+    return text.replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   function truncate(text, maxLen) {
@@ -67,7 +65,12 @@
     workspace: true, workspaceIcon: true, workspaceTabIcon: true,
     keyboardShortcut: true, pageSize: true, disableInclusion: true,
     searchHome: true, inbox: true, calendarRoot: true, dateNote: true,
-    sorted: true, label: true, favPanelId: true
+    sorted: true, label: true, favPanelId: true,
+    docName: true, customResourceProvider: true,
+    appCss: true, appScript: true, shareCss: true, shareJs: true,
+    customWidget: true, widget: true, runOnInstance: true,
+    runOnFrontend: true, run: true, appTheme: true,
+    template: true, inherit: true, relation: true
   };
 
   function isSystemLabel(name) {
@@ -299,7 +302,12 @@
           var tags = attrs.filter(function(a) { return a.type === 'label'; }).map(function(a) {
             return { name: a.name, value: a.value || '' };
           });
-          return { noteId: n.noteId, title: n.title, type: n.type, mime: n.mime, tags: tags };
+          var content = '';
+          try {
+            var raw = n.getContent();
+            content = (raw || '').replace(/<[^>]+>/g, '').replace(/&[^;]+;/g, ' ').replace(/\s+/g, ' ').trim().substring(0, 200);
+          } catch (e) {}
+          return { noteId: n.noteId, title: n.title, type: n.type, mime: n.mime, tags: tags, description: content };
         });
         return { total: total, notes: pageNotes };
       }, [query, pageSize, offset]);
@@ -312,8 +320,12 @@
       if (totalPages > 1) {
         var info = document.createElement('span');
         info.textContent = currentPage + '/' + totalPages + ' 页，共 ' + totalCount + ' 条';
+
         var select = document.createElement('select');
         select.className = 'page-select';
+        var rs = getComputedStyle(document.documentElement);
+        select.style.color = rs.getPropertyValue('--main-text-color').trim() || 'inherit';
+        select.style.backgroundColor = rs.getPropertyValue('--main-background-color').trim() || 'transparent';
         [25, 50, 100, 200].forEach(function(s) {
           var opt = document.createElement('option');
           opt.value = s; opt.textContent = s + ' 条/页';
@@ -323,6 +335,7 @@
         select.addEventListener('change', function() { pageSize = parseInt(this.value); performSearch(1); });
         metaEl.appendChild(select);
         metaEl.appendChild(info);
+
         if (currentPage > 1) {
           var prevBtn = document.createElement('button');
           prevBtn.className = 'page-btn'; prevBtn.textContent = '‹ 上一页';
@@ -349,6 +362,7 @@
           var card = document.createElement('div');
           card.className = 'fav-card';
           card.addEventListener('click', function() { api.activateNote(n.noteId); });
+
           var cardColor = '';
           for (var t = 0; t < n.tags.length; t++) { if (n.tags[t].name === 'color') { cardColor = n.tags[t].value; break; } }
           if (cardColor) card.style.borderColor = cardColor;
@@ -371,7 +385,14 @@
           if (cardColor) titleText.style.color = cardColor;
           card.appendChild(titleRow);
 
-          card.appendChild(createDescEl(n.noteId));
+          var descEl = document.createElement('div');
+          descEl.className = 'fav-card-desc';
+          if (n.description) {
+            descEl.textContent = n.description;
+          } else {
+            descEl.style.display = 'none';
+          }
+          card.appendChild(descEl);
 
           var displayTags = n.tags.filter(function(t) {
             return !isSystemLabel(t.name) && t.name !== 'color' && t.name !== 'iconClass';
@@ -391,38 +412,11 @@
           gridEl.appendChild(card);
         })(notes[i]);
       }
-      fetchDescriptions(notes);
     } catch (e) {
       metaEl.innerHTML = '';
       metaEl.textContent = '搜索失败';
       gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">⚠️</div><p>' + e.message + '</p></div>';
       console.error('收藏夹搜索失败', e);
-    }
-  }
-
-  function createDescEl(noteId) {
-    var descEl = document.createElement('div');
-    descEl.className = 'fav-card-desc';
-    descEl.textContent = '加载中…';
-    descEl.dataset.noteId = noteId;
-    return descEl;
-  }
-
-  async function fetchDescriptions(notes) {
-    for (var i = 0; i < notes.length; i++) {
-      (function(noteData) {
-        api.runOnBackend(function(nId) {
-          var note = api.getNote(nId);
-          if (!note) return '';
-          try { var content = note.getContent(); var d = document.createElement('div'); d.innerHTML = content; return (d.textContent || d.innerText || '').replace(/\s+/g, ' ').trim().substring(0, 200); } catch (e) { return ''; }
-        }, [noteData.noteId]).then(function(text) {
-          var descEls = document.querySelectorAll('.fav-card-desc[data-note-id="' + noteData.noteId + '"]');
-          for (var j = 0; j < descEls.length; j++) {
-            if (text) descEls[j].textContent = text;
-            else descEls[j].style.display = 'none';
-          }
-        });
-      })(notes[i]);
     }
   }
 
