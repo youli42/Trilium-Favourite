@@ -11,14 +11,14 @@ Trilium has a built-in bookmark system, but there's no visual panel to browse al
 This plugin adds a **Favourites Panel** to Trilium's frontend showcase page. It collects notes with a configurable label (default `#favourite`) and displays them as a **card grid** view, with the following features:
 
 - **Card Layout** — Each note is shown as a card with title (bold), description (blockquote), and tags (pills)
-- **Tag Filtering** — Click a tag on any card or in the tag bar to filter notes by that tag
-- **Text Search** — Filter cards by title, content, or tag name in real-time
-- **Custom Icon** — Card title icon uses the note's own `#iconClass` (Box Icons), falls back to type emoji
+- **Advanced Tag Filter** — Two-level tag selection: click tag name to filter by that label (any value), or click tag value for exact match. Selected tags shown in a removable bar
+- **Text Search** — Combined with tag filters, searched on backend with pagination
+- **Pagination** — Page size selector (25/50/100/200), prev/next navigation
+- **Tags Scoped to Collection** — Only tags from notes within the current `#favLabel` collection are shown
+- **Custom Icon** — Card title icon uses the note's own `#iconClass` (Box Icons), defaults to `bx bx-note`
 - **Color Accent** — Cards with a `#color` label use that color for the border and title text
 - **Responsive Grid** — Cards auto-arrange and wrap based on page width
 - **Theme Aware** — Styling follows Trilium's theme using CSS variables
-
-![样例](file/show.png)
 
 ## Installation
 
@@ -47,11 +47,11 @@ Download the latest archive from the [Releases](../../releases) page and import 
 The panel reads its configuration from promoted attributes on the render note itself.
 Edit them in the note's attribute panel (labeled fields will appear automatically).
 
-| Attribute          | Description                                           | Default     |
-| ------------------ | ----------------------------------------------------- | ----------- |
-| `#favLabel`        | The label to search for                               | `favourite` |
-| `#favDescLines`    | Number of description lines to show                   | `3`         |
-| `#favInheritColor` | Whether to use inherited `#color` labels (true/false) | `false`     |
+| Attribute | Description | Default |
+|---|---|---|
+| `#favLabel` | The label to search for | `favourite` |
+| `#favDescLines` | Number of description lines to show | `3` |
+| `#favInheritColor` | Whether to use inherited `#color` labels | `false` |
 
 You can clone this panel and give each clone a different `#favLabel` to create multiple categorised collections (e.g. `#bookmark`, `#readlater`, `#project`).
 
@@ -59,25 +59,36 @@ You can clone this panel and give each clone a different `#favLabel` to create m
 
 ### APIs Used
 
-| API                                | Purpose                                     |
-| ---------------------------------- | ------------------------------------------- |
-| `api.searchForNotes("#favourite")` | Search all notes with the configured label  |
-| `note.getLabels()`                 | Get own labels (for tags, iconClass, color) |
-| `note.getLabelValue("color")`      | Get effective color (own or inherited)      |
-| `note.getContent()`                | Get note HTML content for description       |
-| `api.activateNote(noteId)`         | Navigate to a note on card click            |
+| API | Purpose |
+|---|---|
+| `api.searchForNotes("#favourite")` | Search all notes with the configured label |
+| `api.runOnBackend(callback, args)` | Execute backend code (config reading, tag loading, paginated search) |
+| `api.sql.getRows(query, params)` | SQL query for loading tags scoped to the collection |
+| `note.getAttributes()` | Get all labels of a note (on backend) |
+| `note.getContent()` | Get note HTML content for description |
+| `api.activateNote(noteId)` | Navigate to a note on card click |
+| `api.getNote(noteId)` | Get a note by ID (on backend) |
+| `note.getParentNotes()` | Traverse up the note tree to find the render note |
+| `getComputedStyle(document.documentElement)` | Read Trilium theme CSS variables for theming |
 
 ### Implementation Details
 
-1. **Config Reading**: The panel searches for itself using `api.searchForNotes("#favPanelId = main")` to find its own render note, then reads promoted attributes (`favLabel`, `favDescLines`, `favInheritColor`) from it. This avoids the trap of using `api.currentNote` (which points to the JS code note, not the render note).
+1. **Config Reading**: The JS code traverses the note tree from itself upward: `api.currentNote (JS code) → parent (HTML template) → parent (render note)`. The promoted attributes (`favLabel`, `favDescLines`, `favInheritColor`) are read from the render note using `api.runOnBackend` to ensure reliable access.
 
-2. **Label Exclusion**: System labels (`color`, `iconClass`, `archived`, etc.) and the configured `favLabel` are excluded from the tag list, so they only serve their functional purpose without cluttering the UI.
+2. **Tag Loading**: All tags from notes within the current `#favLabel` collection are loaded via a backend SQL query with a subquery filter. System labels (`color`, `iconClass`, `archived`, `docName`, `customResourceProvider`, etc.) and the configured `favLabel` itself are excluded from the tag list.
 
-3. **Card Icons**: Iterates `note.getLabels()` (own labels only) to find `iconClass`. If present, renders an `<i>` element with the Box Icons class; otherwise falls back to a type-based emoji.
+3. **Two-Level Tag Filter**: Each tag chip has two clickable areas:
+   - **Tag name**: Filters by that label name, showing notes with any value for that label
+   - **Tag value (if present)**: Filters by exact label + value match
+   Both can be combined. Active filters are displayed in a removable bar above the tags.
 
-4. **Card Colors**: By default uses only the note's own `#color` label (not inherited). Set `favInheritColor = true` to use the effective color including inheritance.
+4. **Search Execution**: Combines `#favLabel` + text query + selected tag filters into a Trilium search query string, then executes on the backend with pagination. Results include tags, iconClass, color, and description (HTML stripped via regex, no DOM needed on backend).
 
-5. **Live Filtering**: Both tag filter and text search operate on the already-loaded data in memory. Tag filter uses OR logic (note matching ANY selected tag is shown); text search uses AND logic combined with tag filter.
+5. **Card Icons**: Iterates the note's own labels to find `iconClass`. If present, renders an `<i>` element with the Box Icons class; otherwise defaults to `bx bx-note`.
+
+6. **Card Colors**: By default uses only the note's own `#color` label (from `getAttributes()` on backend, filtering by own noteId). Set `favInheritColor = true` to use inherited color via `getLabelValue('color')`.
+
+7. **Pagination**: The backend returns sliced results with total count. Page size can be changed via dropdown (25/50/100/200). The `<select>` element explicitly reads `--main-text-color` and `--main-background-color` CSS variables for proper theme integration.
 
 ### Plugin Structure
 
@@ -90,5 +101,3 @@ nlKR1j0QzfmS (Frontend Showcase)
         └── ZwetGOsxjRRi html (code, mime: text/html)
               └── PaGSIRd20Aup js (code, mime: application/javascript;env=frontend)
 ```
-
-
