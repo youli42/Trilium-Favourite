@@ -35,7 +35,7 @@
   var allTags = [], selectedTags = {}, selectedNames = {};
   var currentPage = 1, pageSize = 25;
   var _cachedNoteIds = [], _cachedTotal = 0;
-  var _searchSeq = 0;
+  var _searchSeq = 0, _searchTimer = null;
   var searchInput, tagInput, selectedTagsEl, tagRowsEl, metaEl, gridEl;
 
   var _sysLabels = {
@@ -62,7 +62,7 @@
           "SELECT a.name, COALESCE(a.value,'') v, COUNT(*) c FROM attributes a " +
           "WHERE a.type='label' AND a.isDeleted=0 AND a.noteId IN (" +
             "SELECT f.noteId FROM attributes f WHERE f.type='label' AND f.name=? AND f.isDeleted=0" +
-          ") GROUP BY a.name,a.v ORDER BY c DESC", [label]);
+          ") GROUP BY a.name, COALESCE(a.value,'') ORDER BY c DESC", [label]);
         return rows.map(function(r) { return { name: r.name, value: r.v, count: r.c }; });
       }, [_cfgFavLabel]);
     } catch (e) { console.error('loadAllTags', e); allTags = []; }
@@ -313,22 +313,30 @@
     gridEl.appendChild(fragment);
   }
 
-  async function init() {
+  function init() {
     searchInput = document.getElementById('fav-search-input');
     tagInput = document.getElementById('fav-tag-input');
     selectedTagsEl = document.getElementById('fav-selected-tags');
     tagRowsEl = document.getElementById('fav-tag-rows');
     metaEl = document.getElementById('fav-meta');
     gridEl = document.getElementById('fav-grid');
-    try {
-      await readConfig(); await loadAllTags(); renderTags(''); performSearch();
-      searchInput.addEventListener('input', function() { performSearch(1); });
-      tagInput.addEventListener('input', function() { renderTags(this.value); });
-    } catch (e) {
+
+    readConfig().then(function() {
+      loadAllTags().then(function() {
+        renderTags('');
+        performSearch();
+      });
+    }).catch(function(e) {
       metaEl.textContent = '加载失败';
       gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">⚠️</div><p>' + e.message + '</p></div>';
       console.error('初始化失败', e);
-    }
+    });
+
+    searchInput.addEventListener('input', function() {
+      if (_searchTimer) clearTimeout(_searchTimer);
+      _searchTimer = setTimeout(function() { performSearch(1); }, 300);
+    });
+    tagInput.addEventListener('input', function() { renderTags(this.value); });
   }
 
   init();
