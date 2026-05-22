@@ -1,45 +1,8 @@
-// 收藏夹面板 - 展示所有带有指定标签的笔记
+// 收藏夹面板 - 高级标签筛选版
 (function() {
   'use strict';
 
-  function stripHtml(html) {
-    var d = document.createElement('div');
-    d.innerHTML = html;
-    return d.textContent || d.innerText || '';
-  }
-
-  function truncate(text, maxLen) {
-    if (!text) return '';
-    var t = text.replace(/\s+/g, ' ').trim();
-    if (t.length <= maxLen) return t;
-    return t.substring(0, maxLen) + '…';
-  }
-
-  function findOwnValue(labels, name) {
-    for (var i = 0; i < labels.length; i++) {
-      if (labels[i] && labels[i].name === name) return labels[i].value || '';
-    }
-    return '';
-  }
-
-  var EXCLUDED_LABELS = {
-    color: true, iconClass: true, archived: true, cssClass: true,
-    workspace: true, workspaceIcon: true, workspaceTabIcon: true,
-    keyboardShortcut: true, pageSize: true, disableInclusion: true,
-    searchHome: true, inbox: true, calendarRoot: true, dateNote: true,
-    sorted: true, label: true, favPanelId: true
-  };
-
-  function isSystemLabel(name) {
-    return EXCLUDED_LABELS[name] === true
-      || name === _cfgFavLabel
-      || name.indexOf('label:') === 0
-      || name.indexOf('relation:') === 0;
-  }
-
   var _cfgFavLabel, _cfgDescLines, _cfgInheritColor;
-  var allNotes = [], tagMap = {}, activeTags = {}, searchTerm = '';
-  var searchInput, tagBarEl, metaEl, gridEl;
 
   async function readConfig() {
     var config = await api.runOnBackend(function(scriptId) {
@@ -66,190 +29,423 @@
     document.getElementById('fav-app').style.setProperty('--fav-desc-lines', _cfgDescLines);
   }
 
-  async function loadFavourites() {
-    metaEl.textContent = '加载中…';
-    gridEl.innerHTML = '';
-    tagBarEl.innerHTML = '';
-    allNotes = [];
-    tagMap = {};
-    activeTags = {};
+  function stripHtml(html) {
+    var d = document.createElement('div');
+    d.innerHTML = html;
+    return d.textContent || d.innerText || '';
+  }
 
+  function truncate(text, maxLen) {
+    if (!text) return '';
+    var t = text.replace(/\s+/g, ' ').trim();
+    if (t.length <= maxLen) return t;
+    return t.substring(0, maxLen) + '…';
+  }
+
+  function tagKey(name, value) {
+    return name + '\x00' + (value || '');
+  }
+
+  function parseTagKey(key) {
+    var idx = key.indexOf('\x00');
+    return { name: key.substring(0, idx), value: key.substring(idx + 1) || '' };
+  }
+
+  function formatTagDisplay(name, value) {
+    return value ? name + ': ' + value : name;
+  }
+
+  var allTags = [];
+  var selectedTags = {};
+  var selectedNames = {};
+  var currentPage = 1;
+  var pageSize = 25;
+  var searchInput, tagInput, selectedTagsEl, tagRowsEl, metaEl, gridEl;
+
+  var EXCLUDED_LABELS = {
+    color: true, iconClass: true, archived: true, cssClass: true,
+    workspace: true, workspaceIcon: true, workspaceTabIcon: true,
+    keyboardShortcut: true, pageSize: true, disableInclusion: true,
+    searchHome: true, inbox: true, calendarRoot: true, dateNote: true,
+    sorted: true, label: true, favPanelId: true
+  };
+
+  function isSystemLabel(name) {
+    return EXCLUDED_LABELS[name] === true
+      || name === _cfgFavLabel
+      || name.indexOf('label:') === 0
+      || name.indexOf('relation:') === 0;
+  }
+
+  async function loadAllTags() {
     try {
-      await readConfig();
-
-      var notes = await api.searchForNotes('#' + _cfgFavLabel);
-      if (!notes || notes.length === 0) {
-        metaEl.textContent = '暂无收藏笔记';
-        gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">⭐</div><p>还没有收藏笔记</p><p class="fav-hint">给笔记添加 #' + _cfgFavLabel + ' 标签即可在此显示</p></div>';
-        return;
-      }
-
-      for (var i = 0; i < notes.length; i++) {
-        var note = notes[i];
-        var labels;
-        try { labels = note.getLabels() || []; } catch (e) { labels = []; }
-
-        var ownIcon  = findOwnValue(labels, 'iconClass');
-        var ownColor;
-        if (_cfgInheritColor) {
-          ownColor = note.getLabelValue('color') || '';
-        } else {
-          ownColor = findOwnValue(labels, 'color');
-        }
-
-        var tags = [];
-        for (var j = 0; j < labels.length; j++) {
-          var lb = labels[j];
-          if (!lb || lb.name === 'color' || lb.name === 'iconClass' || isSystemLabel(lb.name)) continue;
-          var display = lb.value ? lb.name + ': ' + lb.value : lb.name;
-          var key = lb.name + '\x00' + (lb.value || '');
-          tags.push({ name: lb.name, value: lb.value || '', display: display, key: key });
-          if (!tagMap[key]) tagMap[key] = { name: lb.name, value: lb.value || '', display: display, count: 0 };
-          tagMap[key].count++;
-        }
-
-        var description = '';
-        try { description = truncate(stripHtml(await note.getContent()), 200); } catch (e) {}
-
-        allNotes.push({
-          noteId: note.noteId, title: note.title, type: note.type, mime: note.mime,
-          iconClass: ownIcon, cardColor: ownColor, description: description, tags: tags
+      allTags = await api.runOnBackend(function() {
+        var rows = api.sql.getRows(
+          "SELECT attr.name, COALESCE(attr.value, '') as value, COUNT(*) as cnt " +
+          "FROM attributes attr " +
+          "WHERE attr.type = 'label' AND attr.isDeleted = 0 " +
+          "GROUP BY attr.name, attr.value " +
+          "ORDER BY cnt DESC"
+        );
+        return rows.map(function(r) {
+          return { name: r.name, value: r.value, count: r.cnt };
         });
-      }
-
-      renderTagBar();
-      metaEl.textContent = notes.length + ' 条收藏笔记（标签: #' + _cfgFavLabel + '）';
-      renderCards();
-
+      }, []);
     } catch (e) {
-      metaEl.textContent = '加载失败';
-      gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">⚠️</div><p>' + e.message + '</p><p class="fav-hint" style="margin-top:12px;font-size:11px;word-break:break-all;">请在收藏夹面板笔记属性中设置 #favLabel</p></div>';
-      console.error('收藏夹面板加载失败', e);
+      console.error('Failed to load tags', e);
+      allTags = [];
     }
   }
 
-  function renderTagBar() {
-    tagBarEl.innerHTML = '';
-    var keys = Object.keys(tagMap);
-    var sorted = keys.map(function(k) { return tagMap[k]; }).sort(function(a, b) { return b.count - a.count || a.display.localeCompare(b.display); });
-    if (sorted.length === 0) return;
-
-    for (var i = 0; i < sorted.length; i++) {
-      (function(key, display, count) {
-        var chip = document.createElement('span');
-        chip.className = 'fav-tag-chip';
-        if (activeTags[key]) chip.classList.add('active');
-        chip.textContent = display + ' ' + count;
-        chip.addEventListener('click', function() { toggleTagFilter(key); });
-        tagBarEl.appendChild(chip);
-      })(sorted[i].name + '\x00' + sorted[i].value, sorted[i].display, sorted[i].count);
-    }
-  }
-
-  function updateTagBarActiveState() {
-    var chips = tagBarEl.querySelectorAll('.fav-tag-chip');
-    var keys = Object.keys(tagMap);
-    var sorted = keys.map(function(k) { return tagMap[k]; }).sort(function(a, b) { return b.count - a.count || a.display.localeCompare(b.display); });
-    for (var i = 0; i < sorted.length && i < chips.length; i++) {
-      var key = sorted[i].name + '\x00' + sorted[i].value;
-      chips[i].classList.toggle('active', !!activeTags[key]);
-    }
-  }
-
-  function toggleTagFilter(key) {
-    if (activeTags[key]) delete activeTags[key];
-    else activeTags[key] = true;
-    updateTagBarActiveState();
-    renderCards();
-  }
-
-  function renderCards() {
-    gridEl.innerHTML = '';
-    var filtered = allNotes.filter(function(n) {
-      var tagKeys = Object.keys(activeTags);
-      if (tagKeys.length > 0) {
-        var ntk = {};
-        for (var t = 0; t < n.tags.length; t++) ntk[n.tags[t].key] = true;
-        var match = false;
-        for (var k = 0; k < tagKeys.length; k++) { if (ntk[tagKeys[k]]) { match = true; break; } }
-        if (!match) return false;
-      }
-      if (searchTerm) {
-        var st = searchTerm.toLowerCase();
-        if (n.title.toLowerCase().indexOf(st) < 0 && n.description.toLowerCase().indexOf(st) < 0) {
-          var inTags = false;
-          for (var t = 0; t < n.tags.length; t++) { if (n.tags[t].display.toLowerCase().indexOf(st) >= 0) { inTags = true; break; } }
-          if (!inTags) return false;
-        }
+  function renderTags(filterText) {
+    var filtered = allTags.filter(function(t) {
+      if (isSystemLabel(t.name)) return false;
+      if (filterText) {
+        var ft = filterText.toLowerCase();
+        return formatTagDisplay(t.name, t.value).toLowerCase().indexOf(ft) >= 0;
       }
       return true;
     });
 
-    var total = allNotes.length;
-    metaEl.textContent = filtered.length < total ? filtered.length + ' / ' + total + ' 条收藏笔记（标签: #' + _cfgFavLabel + '）' : total + ' 条收藏笔记（标签: #' + _cfgFavLabel + '）';
+    filtered.sort(function(a, b) { return b.count - a.count || a.name.localeCompare(b.name) || a.value.localeCompare(b.value); });
 
-    if (filtered.length === 0) {
-      gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">🔍</div><p>没有匹配的笔记</p></div>';
+    var ROWS = 2, TAGS_PER_ROW = 10;
+    var visible = filtered.slice(0, ROWS * TAGS_PER_ROW);
+
+    tagRowsEl.innerHTML = '';
+
+    if (visible.length === 0) {
+      tagRowsEl.innerHTML = '<div class="fav-empty-tags">没有匹配的标签</div>';
       return;
     }
 
-    for (var i = 0; i < filtered.length; i++) {
-      var n = filtered[i];
-      var card = document.createElement('div');
-      card.className = 'fav-card';
-      (function(id) { card.addEventListener('click', function() { api.activateNote(id); }); })(n.noteId);
+    for (var r = 0; r < ROWS; r++) {
+      var start = r * TAGS_PER_ROW;
+      var end = Math.min(start + TAGS_PER_ROW, visible.length);
+      if (start >= visible.length) break;
 
-      if (n.cardColor) card.style.borderColor = n.cardColor;
+      var row = document.createElement('div');
+      row.className = 'fav-tag-row';
 
-      var titleRow = document.createElement('div');
-      titleRow.className = 'fav-card-title';
-      var iconEl = document.createElement('span');
-      iconEl.className = 'fav-card-title-icon i-class';
-      var iTag = document.createElement('i');
-      iTag.className = n.iconClass || 'bx bx-note';
-      iconEl.appendChild(iTag);
-      var titleText = document.createElement('span');
-      titleText.className = 'fav-card-title-text';
-      titleText.textContent = n.title;
-      titleText.title = n.title;
-      titleRow.appendChild(iconEl);
-      titleRow.appendChild(titleText);
-      if (n.cardColor) titleText.style.color = n.cardColor;
-      card.appendChild(titleRow);
+      for (var i = start; i < end; i++) {
+        var t = visible[i];
+        var chip = document.createElement('span');
+        chip.className = 'fav-tag-chip';
 
-      if (n.description) {
-        var descEl = document.createElement('div');
-        descEl.className = 'fav-card-desc';
-        descEl.textContent = n.description;
-        card.appendChild(descEl);
-      }
+        var key = tagKey(t.name, t.value);
+        if (selectedTags[key]) chip.classList.add('active');
+        if (selectedNames[t.name]) chip.classList.add('name-active');
 
-      if (n.tags.length > 0) {
-        var tagsEl = document.createElement('div');
-        tagsEl.className = 'fav-card-tags';
-        for (var t = 0; t < n.tags.length; t++) {
-          (function(ti) {
-            var tagEl = document.createElement('span');
-            tagEl.className = 'fav-card-tag';
-            tagEl.textContent = ti.display;
-            tagEl.addEventListener('click', function(e) { e.stopPropagation(); toggleTagFilter(ti.key); });
-            tagsEl.appendChild(tagEl);
-          })(n.tags[t]);
+        var ns = document.createElement('span');
+        ns.className = 'tag-name';
+        ns.textContent = t.name;
+        (function(n) {
+          ns.addEventListener('click', function(e) {
+            e.stopPropagation();
+            toggleName(n);
+          });
+        })(t.name);
+        chip.appendChild(ns);
+
+        if (t.value) {
+          var ss = document.createElement('span');
+          ss.className = 'tag-sep';
+          ss.textContent = ':';
+          var vs = document.createElement('span');
+          vs.className = 'tag-value';
+          vs.textContent = t.value;
+          (function(n, v) {
+            vs.addEventListener('click', function(e) {
+              e.stopPropagation();
+              toggleTag(n, v);
+            });
+          })(t.name, t.value);
+          chip.appendChild(ss);
+          chip.appendChild(vs);
         }
-        card.appendChild(tagsEl);
-      }
 
-      gridEl.appendChild(card);
+        if (t.count > 0) {
+          var cs = document.createElement('span');
+          cs.className = 'tag-count';
+          cs.textContent = t.count;
+          chip.appendChild(cs);
+        }
+
+        row.appendChild(chip);
+      }
+      tagRowsEl.appendChild(row);
     }
   }
 
-  function init() {
+  function toggleTag(name, value) {
+    var key = tagKey(name, value);
+    if (selectedTags[key]) delete selectedTags[key];
+    else selectedTags[key] = true;
+    renderSelectedTagsBar();
+    renderTags(tagInput.value);
+    performSearch();
+  }
+
+  function toggleName(name) {
+    if (selectedNames[name]) delete selectedNames[name];
+    else selectedNames[name] = true;
+    renderSelectedTagsBar();
+    renderTags(tagInput.value);
+    performSearch();
+  }
+
+  function clearSelected() {
+    selectedTags = {};
+    selectedNames = {};
+    renderSelectedTagsBar();
+    renderTags(tagInput.value);
+    performSearch();
+  }
+
+  function renderSelectedTagsBar() {
+    selectedTagsEl.innerHTML = '';
+    var nk = Object.keys(selectedNames);
+    var vk = Object.keys(selectedTags);
+    if (nk.length === 0 && vk.length === 0) return;
+
+    nk.forEach(function(name) {
+      var tag = document.createElement('span');
+      tag.className = 'fav-selected-tag';
+      tag.style.borderColor = 'rgba(100,200,100,0.5)';
+      tag.appendChild(document.createTextNode(name + ' *'));
+      var remove = document.createElement('span');
+      remove.className = 'remove-tag';
+      remove.textContent = '✕';
+      remove.addEventListener('click', function(e) { e.stopPropagation(); toggleName(name); });
+      tag.appendChild(remove);
+      selectedTagsEl.appendChild(tag);
+    });
+
+    vk.forEach(function(key) {
+      var p = parseTagKey(key);
+      var tag = document.createElement('span');
+      tag.className = 'fav-selected-tag';
+      tag.appendChild(document.createTextNode(formatTagDisplay(p.name, p.value)));
+      var remove = document.createElement('span');
+      remove.className = 'remove-tag';
+      remove.textContent = '✕';
+      (function(n, v) {
+        remove.addEventListener('click', function(e) { e.stopPropagation(); toggleTag(n, v); });
+      })(p.name, p.value);
+      tag.appendChild(remove);
+      selectedTagsEl.appendChild(tag);
+    });
+
+    var clearBtn = document.createElement('span');
+    clearBtn.className = 'fav-selected-tag';
+    clearBtn.textContent = '清空全部';
+    clearBtn.style.cursor = 'pointer';
+    clearBtn.addEventListener('click', clearSelected);
+    selectedTagsEl.appendChild(clearBtn);
+  }
+
+  function buildQuery(textQuery) {
+    var parts = ['#' + _cfgFavLabel];
+    if (textQuery) parts.push(textQuery);
+    var nk = Object.keys(selectedNames);
+    var vk = Object.keys(selectedTags);
+    nk.forEach(function(name) { parts.push('#' + name); });
+    if (vk.length > 0) {
+      var byName = {};
+      vk.forEach(function(key) {
+        var p = parseTagKey(key);
+        if (selectedNames[p.name]) return;
+        if (!byName[p.name]) byName[p.name] = [];
+        byName[p.name].push(p.value);
+      });
+      for (var name in byName) {
+        var vals = byName[name];
+        if (vals.length === 1) {
+          var v = vals[0];
+          if (v.indexOf(' ') >= 0 || v.indexOf('"') >= 0 || v.indexOf('(') >= 0 || v.indexOf(')') >= 0 || v.indexOf('#') >= 0) {
+            parts.push('#' + name + ' = "' + v.replace(/"/g, '\\"') + '"');
+          } else {
+            parts.push('#' + name + ' = ' + v);
+          }
+        } else {
+          var orParts = vals.map(function(v) {
+            if (v.indexOf(' ') >= 0 || v.indexOf('"') >= 0 || v.indexOf('(') >= 0 || v.indexOf(')') >= 0 || v.indexOf('#') >= 0) {
+              return '#' + name + ' = "' + v.replace(/"/g, '\\"') + '"';
+            }
+            return '#' + name + ' = ' + v;
+          });
+          parts.push('(' + orParts.join(' or ') + ')');
+        }
+      }
+    }
+    return parts.join(' ');
+  }
+
+  async function performSearch(page) {
+    if (page !== undefined) currentPage = page;
+    else currentPage = 1;
+    var textQuery = searchInput.value.trim();
+    metaEl.innerHTML = '搜索中...';
+    gridEl.innerHTML = '';
+    var query = buildQuery(textQuery);
+    var offset = (currentPage - 1) * pageSize;
+
+    try {
+      var result = await api.runOnBackend(function(q, limit, off) {
+        var all = api.searchForNotes(q);
+        var total = all.length;
+        var pageNotes = all.slice(off, off + limit).map(function(n) {
+          var attrs = n.getAttributes();
+          var tags = attrs.filter(function(a) { return a.type === 'label'; }).map(function(a) {
+            return { name: a.name, value: a.value || '' };
+          });
+          return { noteId: n.noteId, title: n.title, type: n.type, mime: n.mime, tags: tags };
+        });
+        return { total: total, notes: pageNotes };
+      }, [query, pageSize, offset]);
+
+      var notes = result.notes;
+      var totalCount = result.total;
+      var totalPages = Math.ceil(totalCount / pageSize);
+      metaEl.innerHTML = '';
+
+      if (totalPages > 1) {
+        var info = document.createElement('span');
+        info.textContent = currentPage + '/' + totalPages + ' 页，共 ' + totalCount + ' 条';
+        var select = document.createElement('select');
+        select.className = 'page-select';
+        [25, 50, 100, 200].forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s; opt.textContent = s + ' 条/页';
+          if (s === pageSize) opt.selected = true;
+          select.appendChild(opt);
+        });
+        select.addEventListener('change', function() { pageSize = parseInt(this.value); performSearch(1); });
+        metaEl.appendChild(select);
+        metaEl.appendChild(info);
+        if (currentPage > 1) {
+          var prevBtn = document.createElement('button');
+          prevBtn.className = 'page-btn'; prevBtn.textContent = '‹ 上一页';
+          (function(p) { prevBtn.addEventListener('click', function() { performSearch(p); }); })(currentPage - 1);
+          metaEl.appendChild(prevBtn);
+        }
+        if (currentPage < totalPages) {
+          var nextBtn = document.createElement('button');
+          nextBtn.className = 'page-btn'; nextBtn.textContent = '下一页 ›';
+          (function(p) { nextBtn.addEventListener('click', function() { performSearch(p); }); })(currentPage + 1);
+          metaEl.appendChild(nextBtn);
+        }
+      } else {
+        metaEl.textContent = totalCount + ' 条结果';
+      }
+
+      if (notes.length === 0) {
+        gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">🔍</div><p>没有找到匹配的笔记</p></div>';
+        return;
+      }
+
+      for (var i = 0; i < notes.length; i++) {
+        (function(n) {
+          var card = document.createElement('div');
+          card.className = 'fav-card';
+          card.addEventListener('click', function() { api.activateNote(n.noteId); });
+          var cardColor = '';
+          for (var t = 0; t < n.tags.length; t++) { if (n.tags[t].name === 'color') { cardColor = n.tags[t].value; break; } }
+          if (cardColor) card.style.borderColor = cardColor;
+
+          var titleRow = document.createElement('div');
+          titleRow.className = 'fav-card-title';
+          var iconEl = document.createElement('span');
+          iconEl.className = 'fav-card-title-icon i-class';
+          var iTag = document.createElement('i');
+          var ownIcon = '';
+          for (var t = 0; t < n.tags.length; t++) { if (n.tags[t].name === 'iconClass') { ownIcon = n.tags[t].value; break; } }
+          iTag.className = ownIcon || 'bx bx-note';
+          iconEl.appendChild(iTag);
+          var titleText = document.createElement('span');
+          titleText.className = 'fav-card-title-text';
+          titleText.textContent = n.title;
+          titleText.title = n.title;
+          titleRow.appendChild(iconEl);
+          titleRow.appendChild(titleText);
+          if (cardColor) titleText.style.color = cardColor;
+          card.appendChild(titleRow);
+
+          card.appendChild(createDescEl(n.noteId));
+
+          var displayTags = n.tags.filter(function(t) {
+            return !isSystemLabel(t.name) && t.name !== 'color' && t.name !== 'iconClass';
+          });
+          if (displayTags.length > 0) {
+            var tagsEl = document.createElement('div');
+            tagsEl.className = 'fav-card-tags';
+            displayTags.forEach(function(tag) {
+              var tagEl = document.createElement('span');
+              tagEl.className = 'fav-card-tag';
+              tagEl.textContent = formatTagDisplay(tag.name, tag.value);
+              tagEl.addEventListener('click', function(e) { e.stopPropagation(); toggleTag(tag.name, tag.value); });
+              tagsEl.appendChild(tagEl);
+            });
+            card.appendChild(tagsEl);
+          }
+          gridEl.appendChild(card);
+        })(notes[i]);
+      }
+      fetchDescriptions(notes);
+    } catch (e) {
+      metaEl.innerHTML = '';
+      metaEl.textContent = '搜索失败';
+      gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">⚠️</div><p>' + e.message + '</p></div>';
+      console.error('收藏夹搜索失败', e);
+    }
+  }
+
+  function createDescEl(noteId) {
+    var descEl = document.createElement('div');
+    descEl.className = 'fav-card-desc';
+    descEl.textContent = '加载中…';
+    descEl.dataset.noteId = noteId;
+    return descEl;
+  }
+
+  async function fetchDescriptions(notes) {
+    for (var i = 0; i < notes.length; i++) {
+      (function(noteData) {
+        api.runOnBackend(function(nId) {
+          var note = api.getNote(nId);
+          if (!note) return '';
+          try { var content = note.getContent(); var d = document.createElement('div'); d.innerHTML = content; return (d.textContent || d.innerText || '').replace(/\s+/g, ' ').trim().substring(0, 200); } catch (e) { return ''; }
+        }, [noteData.noteId]).then(function(text) {
+          var descEls = document.querySelectorAll('.fav-card-desc[data-note-id="' + noteData.noteId + '"]');
+          for (var j = 0; j < descEls.length; j++) {
+            if (text) descEls[j].textContent = text;
+            else descEls[j].style.display = 'none';
+          }
+        });
+      })(notes[i]);
+    }
+  }
+
+  async function init() {
     searchInput = document.getElementById('fav-search-input');
-    tagBarEl = document.getElementById('fav-tag-bar');
+    tagInput = document.getElementById('fav-tag-input');
+    selectedTagsEl = document.getElementById('fav-selected-tags');
+    tagRowsEl = document.getElementById('fav-tag-rows');
     metaEl = document.getElementById('fav-meta');
     gridEl = document.getElementById('fav-grid');
-    loadFavourites();
-    searchInput.addEventListener('input', function() { searchTerm = this.value.trim(); renderCards(); });
+
+    try {
+      await readConfig();
+      await loadAllTags();
+      renderTags('');
+      performSearch();
+      searchInput.addEventListener('input', function() { performSearch(1); });
+      tagInput.addEventListener('input', function() { renderTags(this.value); });
+    } catch (e) {
+      metaEl.textContent = '加载失败';
+      gridEl.innerHTML = '<div class="fav-empty"><div class="fav-empty-icon">⚠️</div><p>' + e.message + '</p></div>';
+      console.error('收藏夹面板初始化失败', e);
+    }
   }
 
   init();
